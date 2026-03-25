@@ -55,3 +55,4 @@ chmod +x *.sh
 2. AI가 백그라운드에서 `save_memo` 도구를 호출하며 `title`, `content`, `folder`(선택) 등의 데이터를 전달합니다.
 3. 로컬 Obsidian Vault의 지정된 위치에 실시간으로 `.md` 파일이 생성되며 즉시 에디터에서 확인할 수 있습니다!
 
+
