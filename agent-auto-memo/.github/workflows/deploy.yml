@@ -19,7 +19,7 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           script: |
             # 주의: 서버에서 프로젝트가 위치한 절대 경로로 변경해주세요.
-            cd /path/to/your/agent-auto-memo 
+            cd /data/volumes/agent-auto-memo
             
             # 최신 코드를 받아옵니다.
             git pull origin main 
