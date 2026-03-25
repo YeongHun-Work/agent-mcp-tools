@@ -1,0 +1,31 @@
+name: Deploy agent-auto-memo
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'agent-auto-memo/**' # agent-auto-memo 폴더 내부에 변경이 생길 때만 Action이 실행됨!
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            # 서버에 클론하신 폴더 구조에 맞게 경로를 수정해 주세요.
+            # 서버 단에서는 이 폴더로 진입해서 컨테이너를 올리기만 하면 해당 폴더의 소스만 적용됩니다.
+            cd /data/volumes/agent-auto-memo
+            
+            # 전체 저장소의 최신 코드를 받아오지만,
+            git pull origin main 
+            
+            # 이 디렉토리(agent-auto-memo)에서 빌드하므로 해당 폴더 내용만 컨테이너에 적용됩니다.
+            docker-compose up -d --build
