@@ -10,8 +10,9 @@ from mcp.server.stdio import stdio_server
 
 import aiofiles
 
-# FastAPI imports for SSE
-from fastapi import FastAPI
+# Starlette imports for raw ASGI SSE
+from starlette.applications import Starlette
+from starlette.routing import Route
 from mcp.server.sse import SseServerTransport
 import uvicorn
 from starlette.requests import Request
@@ -123,18 +124,20 @@ async def run_stdio():
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
-# SSE 통신을 위한 FastAPI 설정
-app = FastAPI()
+# SSE 통신을 위한 Starlette 설정
 sse = SseServerTransport("/messages")
 
-@app.get("/sse")
 async def handle_sse(request: Request):
     async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
         await server.run(streams[0], streams[1], server.create_initialization_options())
 
-@app.post("/messages")
 async def handle_messages(request: Request):
     await sse.handle_post_message(request.scope, request.receive, request._send)
+
+app = Starlette(debug=True, routes=[
+    Route("/sse", endpoint=handle_sse),
+    Route("/messages", endpoint=handle_messages, methods=["POST"])
+])
 
 import sys
 
