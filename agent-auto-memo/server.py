@@ -68,6 +68,7 @@ async def list_tools() -> list[types.Tool]:
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+    print(f"[call_tool] name={name}, title={arguments.get('title','')}, folder={arguments.get('folder','')}", file=sys.stderr, flush=True)
     if name != "save_memo":
         raise ValueError(f"Unknown tool: {name}")
 
@@ -101,6 +102,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
     
     file_path = os.path.join(target_dir, filename)
 
+    print(f"[call_tool] writing to: {file_path}", file=sys.stderr, flush=True)
     try:
         # 대상 폴더가 없으면 생성
         os.makedirs(target_dir, exist_ok=True)
@@ -114,6 +116,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             text=f"성공적으로 메모가 로컬에 저장되었습니다! 경로: '{file_path}'"
         )]
     except Exception as e:
+        print(f"[call_tool] ERROR: {e}", file=sys.stderr, flush=True)
         return [types.TextContent(type="text", text=f"메모 로컬 저장 중 실패: {str(e)}")]
 
 # ==========================================
