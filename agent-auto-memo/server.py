@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 import asyncio
 from datetime import datetime
@@ -15,7 +16,6 @@ from starlette.applications import Starlette
 from starlette.routing import Route
 from mcp.server.sse import SseServerTransport
 import uvicorn
-from starlette.requests import Request
 
 # 환경변수 로드
 load_dotenv()
@@ -120,26 +120,25 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
 # Transport Runners
 # ==========================================
 async def run_stdio():
-    print("Starting agent-auto-memo with stdio transport...", flush=True)
+    print("Starting agent-auto-memo with stdio transport...", file=sys.stderr, flush=True)
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 # SSE 통신을 위한 Starlette 설정
 sse = SseServerTransport("/messages")
 
-async def handle_sse(request: Request):
-    async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
+async def handle_sse(scope, receive, send):
+    async with sse.connect_sse(scope, receive, send) as streams:
         await server.run(streams[0], streams[1], server.create_initialization_options())
 
-async def handle_messages(request: Request):
-    await sse.handle_post_message(request.scope, request.receive, request._send)
+async def handle_messages(scope, receive, send):
+    await sse.handle_post_message(scope, receive, send)
 
 app = Starlette(debug=True, routes=[
     Route("/sse", endpoint=handle_sse),
     Route("/messages", endpoint=handle_messages, methods=["POST"])
 ])
 
-import sys
 
 def main():
     # .env 의 값을 기본으로 하되, 실행 시 명령줄(Argument)로 넘어온 값이 있으면 우선 적용합니다.
@@ -151,7 +150,7 @@ def main():
             mode = "sse"
 
     if mode == "sse":
-        print(f"Starting agent-auto-memo with SSE transport on port {SSE_PORT}...")
+        print(f"Starting agent-auto-memo with SSE transport on port {SSE_PORT}...", file=sys.stderr)
         uvicorn.run(app, host="0.0.0.0", port=SSE_PORT)
     else:
         # 기본값: stdio
