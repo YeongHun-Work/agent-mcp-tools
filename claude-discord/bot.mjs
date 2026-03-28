@@ -151,8 +151,6 @@ function callClaude(prompt) {
       ? prompt.slice(0, INPUT_MAX_CHARS)
       : prompt;
 
-    console.log(`[Claude CLI] 호출 시작 | 프롬프트 길이: ${safePrompt.length}자`);
-
     const proc = spawn(
       'claude',
       ['-p', safePrompt, '--dangerously-skip-permissions'],
@@ -167,21 +165,11 @@ function callClaude(prompt) {
       }
     );
 
-    console.log(`[Claude CLI] PID: ${proc.pid}`);
-
     let stdout = '';
     let stderr = '';
 
-    proc.stdout.on('data', (chunk) => {
-      const str = chunk.toString();
-      stdout += str;
-      console.log(`[Claude CLI][stdout chunk] ${str.slice(0, 100)}`);
-    });
-    proc.stderr.on('data', (chunk) => {
-      const msg = chunk.toString();
-      stderr += msg;
-      console.log(`[Claude CLI][stderr] ${msg.trim()}`);
-    });
+    proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+    proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
 
     // 타임아웃 처리
     const timer = setTimeout(() => {
@@ -191,20 +179,19 @@ function callClaude(prompt) {
 
     proc.on('close', (code) => {
       clearTimeout(timer);
-      console.log(`[Claude CLI] 종료 | code: ${code} | stdout: ${stdout.length}자 | stderr: ${stderr.length}자`);
       if (code === 0) {
         // ANSI 이스케이프 코드 제거
         const cleaned = stdout.replace(/\x1B\[[0-9;]*[mGKHF]/g, '').trim();
         resolve(cleaned);
       } else {
-        console.error(`[Claude CLI][실패] stderr: ${stderr.trim()}`);
+        console.error(`[Claude CLI 실패] code: ${code} | stderr: ${stderr.trim()}`);
         reject(new Error(`Claude CLI 종료 코드 ${code}: ${stderr.trim()}`));
       }
     });
 
     proc.on('error', (err) => {
       clearTimeout(timer);
-      console.error(`[Claude CLI][error] ${err.message}`);
+      console.error(`[Claude CLI 실행 실패] ${err.message}`);
       reject(new Error(`Claude CLI 실행 실패: ${err.message}`));
     });
   });
@@ -232,8 +219,6 @@ async function appendContext(channelId, question, answer) {
   const lineCount = updated.split('\n').length;
 
   if (lineCount > CONTEXT_MAX_LINES) {
-    // 60줄 초과 시 Claude로 요약 압축
-    console.log(`[컨텍스트 압축] 채널 ${channelId} - ${lineCount}줄 → ${SUMMARY_LINES}줄로 요약`);
     try {
       const summaryPrompt = `다음 대화를 ${SUMMARY_LINES}줄로 요약해줘:\n${updated}`;
       const summarized    = await callClaude(summaryPrompt);
