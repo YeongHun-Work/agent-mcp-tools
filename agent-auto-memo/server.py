@@ -108,16 +108,38 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         # 대상 폴더가 없으면 생성
         os.makedirs(target_dir, exist_ok=True)
 
-        # 파일 직접 쓰기 (비동기)
+        expected_size = len(final_content.encode('utf-8'))
+
+        # 파일 쓰기 + Python 버퍼 → OS 버퍼 flush 명시
         async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
             await f.write(final_content)
+            await f.flush()  # Python 내부 버퍼 → OS 버퍼 강제 flush
 
-        # 파일 쓰기 완료 확인 (실제 저장 검증)
+        # ── 검증 1: 파일 존재 여부 ──────────────────────────────
         if not os.path.exists(file_path):
-            raise IOError(f"파일 쓰기 후 파일이 존재하지 않음: {file_path}")
+            raise IOError(f"파일이 존재하지 않음 (write 후): {file_path}")
 
+        # ── 검증 2: 파일 크기 (0바이트 or 기대치와 크게 다름) ───
         file_size = os.path.getsize(file_path)
-        print(f"[call_tool] write complete: {file_path} ({file_size} bytes)", file=sys.stderr, flush=True)
+        if file_size == 0:
+            raise IOError(f"파일이 비어있음 (0 bytes): {file_path}")
+        if file_size < expected_size * 0.9:  # 10% 이상 차이나면 의심
+            raise IOError(
+                f"파일 크기 불일치: 기대={expected_size} bytes, 실제={file_size} bytes"
+            )
+
+        # ── 검증 3: 내용 앞부분 read-back ───────────────────────
+        async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+            head = await f.read(80)
+        expected_head = final_content[:80]
+        if head != expected_head:
+            raise IOError(
+                f"파일 내용 불일치 (read-back 실패):\n"
+                f"  기대: {repr(expected_head)}\n"
+                f"  실제: {repr(head)}"
+            )
+
+        print(f"[call_tool] verified: {file_path} ({file_size} bytes)", file=sys.stderr, flush=True)
 
         result_text = (
             f"✅ 메모 저장 완료\n"
@@ -161,9 +183,15 @@ class SSEHandler:
                     new_session_id = next(iter(new_ids))
                     print(f"[SSEHandler] Session started: {new_session_id.hex}", file=sys.stderr, flush=True)
 
-                await server.run(streams[0], streams[1], server.create_initialization_options())
+                # server.run이 왜 종료되는지 원인 로깅
+                try:
+                    await server.run(streams[0], streams[1], server.create_initialization_options())
+                    print(f"[SSEHandler] server.run exited normally (session={new_session_id and new_session_id.hex})", file=sys.stderr, flush=True)
+                except Exception as run_err:
+                    print(f"[SSEHandler] server.run raised: {type(run_err).__name__}: {run_err}", file=sys.stderr, flush=True)
+                    raise
         except Exception as e:
-            print(f"[SSEHandler] Session ended: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+            print(f"[SSEHandler] connect_sse ended: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
         finally:
             # MCP 라이브러리가 _read_stream_writers에서 session_id를 제거하지 않는 버그 보완:
             # 세션 종료 시 직접 제거 → 이후 POST 요청이 404로 깔끔하게 처리됨
