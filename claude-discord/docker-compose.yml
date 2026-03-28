@@ -21,11 +21,6 @@ services:
       - ~/.claude.json:/home/node/.claude.json
       # MCP 스킬 목록 — 호스트에서 수정 후 restart만으로 반영 (재빌드 불필요)
       - ./mcp-skills.json:/app/mcp-skills.json:ro
-    # 루트 파일시스템을 읽기 전용으로 마운트 (보안 강화)
-    read_only: true
-    tmpfs:
-      # 임시 파일 전용 tmpfs (읽기 전용 FS 대응)
-      - /tmp
     cap_drop:
       # 모든 Linux Capabilities 제거 (최소 권한 원칙)
       - ALL
