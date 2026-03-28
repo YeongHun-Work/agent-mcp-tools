@@ -151,47 +151,59 @@ function callClaude(prompt) {
       ? prompt.slice(0, INPUT_MAX_CHARS)
       : prompt;
 
-    const proc = spawn(
-      'claude',
-      ['-p', safePrompt, '--dangerously-skip-permissions', '--output-format', 'text'],
-      {
-        shell: false,  // 보안: shell injection 방지
-        stdio: ['ignore', 'pipe', 'pipe'],  // stdin 닫기 (< /dev/null 동일)
-        env: {
-          ...process.env,
-          NO_COLOR: '1',
-          TERM: 'dumb',
-        },
-      }
-    );
+    const args = ['-p', safePrompt, '--dangerously-skip-permissions', '--output-format', 'text'];
+    const opts = {
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, NO_COLOR: '1', TERM: 'dumb' },
+    };
+
+    console.log(`[Claude] 시작 | 프롬프트: ${safePrompt.length}자`);
+    console.log(`[Claude] args: ${args.slice(2).join(' ')}`);
+    console.log(`[Claude] env.HOME: ${opts.env.HOME}`);
+    console.log(`[Claude] env.ANTHROPIC_API_KEY: ${opts.env.ANTHROPIC_API_KEY ? '설정됨' : '없음'}`);
+
+    const proc = spawn('claude', args, opts);
+
+    console.log(`[Claude] PID: ${proc.pid}`);
 
     let stdout = '';
     let stderr = '';
 
-    proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-    proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+    proc.stdout.on('data', (chunk) => {
+      const str = chunk.toString();
+      stdout += str;
+      console.log(`[Claude][stdout] ${JSON.stringify(str)}`);
+    });
+    proc.stderr.on('data', (chunk) => {
+      const str = chunk.toString();
+      stderr += str;
+      console.log(`[Claude][stderr] ${JSON.stringify(str)}`);
+    });
 
     // 타임아웃 처리
     const timer = setTimeout(() => {
       proc.kill('SIGTERM');
+      console.error(`[Claude] 타임아웃 SIGTERM | stdout: ${stdout.length}자 | stderr: ${stderr.length}자`);
       reject(new Error(`Claude CLI 타임아웃 (${CLAUDE_TIMEOUT_MS / 1000}초 초과)`));
     }, CLAUDE_TIMEOUT_MS);
 
-    proc.on('close', (code) => {
+    proc.on('close', (code, signal) => {
       clearTimeout(timer);
+      console.log(`[Claude] 종료 | code: ${code} | signal: ${signal} | stdout: ${stdout.length}자 | stderr: ${stderr.length}자`);
       if (code === 0) {
-        // ANSI 이스케이프 코드 제거
         const cleaned = stdout.replace(/\x1B\[[0-9;]*[mGKHF]/g, '').trim();
+        console.log(`[Claude] 응답 (cleaned): ${JSON.stringify(cleaned.slice(0, 200))}`);
         resolve(cleaned);
       } else {
-        console.error(`[Claude CLI 실패] code: ${code} | stderr: ${stderr.trim()}`);
+        console.error(`[Claude] 실패 | code: ${code} | stderr: ${stderr.trim()}`);
         reject(new Error(`Claude CLI 종료 코드 ${code}: ${stderr.trim()}`));
       }
     });
 
     proc.on('error', (err) => {
       clearTimeout(timer);
-      console.error(`[Claude CLI 실행 실패] ${err.message}`);
+      console.error(`[Claude] spawn 오류: ${err.message}`);
       reject(new Error(`Claude CLI 실행 실패: ${err.message}`));
     });
   });
