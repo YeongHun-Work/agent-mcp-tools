@@ -1,0 +1,6 @@
+[
+  {
+    "name": "agent-auto-memo",
+    "description": "Obsidian 메모 자동 저장. 사용자가 메모나 기록을 요청하면 save_memo 툴을 사용."
+  }
+]

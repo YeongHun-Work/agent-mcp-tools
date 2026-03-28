@@ -1,11 +1,11 @@
-name: Deploy gemini-discord
+name: Deploy codex-discord
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'gemini-discord/**'
+      - 'codex-discord/**'
 
 jobs:
   deploy:
@@ -25,5 +25,5 @@ jobs:
           script: |
             cd $DEPLOY_PATH
             git pull origin main
-            cd gemini-discord
+            cd codex-discord
             docker compose up -d --build

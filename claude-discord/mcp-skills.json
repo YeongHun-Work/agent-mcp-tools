@@ -1,0 +1,8 @@
+[
+  {
+    "name": "agent-auto-memo",
+    "url": "http://192.168.0.100:8000/sse",
+    "transport": "sse",
+    "description": "Obsidian 메모 자동 저장. 사용자가 메모나 기록을 요청하면 save_memo 툴 사용."
+  }
+]
