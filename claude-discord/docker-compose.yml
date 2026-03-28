@@ -16,6 +16,8 @@ services:
     volumes:
       # SQLite DB 및 영속 데이터를 호스트와 공유
       - ./data:/app/data
+      # Claude CLI 인증 정보 마운트 (호스트에서 `claude auth login` 선행 필요)
+      - ~/.claude:/home/node/.claude
       # MCP 스킬 목록 — 호스트에서 수정 후 restart만으로 반영 (재빌드 불필요)
       - ./mcp-skills.json:/app/mcp-skills.json:ro
     # 루트 파일시스템을 읽기 전용으로 마운트 (보안 강화)

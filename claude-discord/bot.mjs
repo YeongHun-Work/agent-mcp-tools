@@ -34,8 +34,7 @@ const DISCORD_MSG_LIMIT  = 2_000;    // Discord 메시지 한 건 최대 길이
 // 시작 환경변수 검증
 // ─────────────────────────────────────────────
 if (!process.env.ANTHROPIC_API_KEY) {
-  console.error('[오류] ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다. .env 파일을 확인하세요.');
-  process.exit(1);
+  console.warn('[경고] ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다. Claude CLI 실행 시 ANTHROPIC_API_KEY 환경변수 또는 `claude auth` 인증이 필요합니다.');
 }
 
 // ─────────────────────────────────────────────
