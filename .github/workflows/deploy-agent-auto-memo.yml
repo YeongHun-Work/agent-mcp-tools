@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'agent-auto-memo/**' # agent-auto-memo 폴더 내부에 변경이 생길 때만 Action이 실행됨!
+      - 'agent-auto-memo/**'
 
 jobs:
   deploy:
@@ -14,20 +14,16 @@ jobs:
     steps:
       - name: Deploy to Server via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT }}
+          envs: DEPLOY_PATH
           script: |
-            # 1. 깃(Git) 저장소가 있는 최상위 폴더로 이동합니다.
-            cd /data/volumes/agent-auto-memo
-            
-            # 2. 최신 코드를 받아옵니다.
-            git pull origin main 
-            
-            # 3. 실제로 docker-compose.yml이 들어있는 하위 폴더로 한 칸 더 들어갑니다.
+            cd $DEPLOY_PATH
+            git pull origin main
             cd agent-auto-memo
-            
-            # 4. 해당 폴더에서만 컨테이너를 올립니다.
             docker compose up -d --build
