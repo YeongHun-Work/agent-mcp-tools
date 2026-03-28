@@ -172,7 +172,11 @@ function callClaude(prompt) {
     let stdout = '';
     let stderr = '';
 
-    proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+    proc.stdout.on('data', (chunk) => {
+      const str = chunk.toString();
+      stdout += str;
+      console.log(`[Claude CLI][stdout chunk] ${str.slice(0, 100)}`);
+    });
     proc.stderr.on('data', (chunk) => {
       const msg = chunk.toString();
       stderr += msg;
