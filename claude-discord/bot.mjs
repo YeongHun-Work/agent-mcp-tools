@@ -151,7 +151,7 @@ function callClaude(prompt) {
       ? prompt.slice(0, INPUT_MAX_CHARS)
       : prompt;
 
-    const args = ['-p', safePrompt, '--dangerously-skip-permissions', '--output-format', 'text'];
+    const args = ['-p', safePrompt, '--dangerously-skip-permissions', '--no-session-persistence'];
     const opts = {
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
