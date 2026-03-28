@@ -153,9 +153,10 @@ function callClaude(prompt) {
 
     const proc = spawn(
       'claude',
-      ['-p', safePrompt],
+      ['-p', safePrompt, '--dangerously-skip-permissions'],
       {
         shell: false,  // 보안: shell injection 방지
+        stdio: ['ignore', 'pipe', 'pipe'],  // stdin 닫기 (< /dev/null 동일)
         env: {
           ...process.env,
           NO_COLOR: '1',
