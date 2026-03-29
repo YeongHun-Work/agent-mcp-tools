@@ -7,6 +7,10 @@ on:
     paths:
       - 'codex-discord/**'
 
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -23,6 +27,7 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           envs: DEPLOY_PATH
           script: |
+            git config --global --add safe.directory $DEPLOY_PATH
             cd $DEPLOY_PATH
             git pull origin main
             cd codex-discord

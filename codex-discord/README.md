@@ -85,7 +85,7 @@ bot.mjs (discord.js v14)
 
 - 파일은 볼륨 마운트로 관리 → **재빌드 없이 수정 후 `docker compose restart`로 반영**
 
-### Codex CLI MCP 설정 (서버 ~/.codex/config.json)
+### Codex CLI MCP 설정 (codex_auth volume 내 config.json)
 
 Codex CLI가 실제로 MCP 툴을 호출하려면 서버의 config.json에 mcpServers 등록 필요:
 
@@ -93,7 +93,7 @@ Codex CLI가 실제로 MCP 툴을 호출하려면 서버의 config.json에 mcpSe
 {
   "mcpServers": {
     "agent-auto-memo": {
-      "url": "http://192.168.0.100:8000/sse"
+      "url": "http://{server_url}:8000/sse"
     }
   }
 }
@@ -116,8 +116,8 @@ GUILD_ID=         # (선택) 길드 ID — 설정 시 해당 서버에만 즉시
 ```
 
 > `OPENAI_API_KEY`는 `.env`에 설정하지 않습니다.
-> `~/.codex` 디렉토리를 볼륨 마운트하면 Codex CLI가 해당 경로의 설정 파일에서 직접 읽습니다.
-> (docker-compose.yml: `~/.codex:/home/node/.codex`)
+> Docker named volume `codex_auth`에 Codex CLI 인증 정보를 보관합니다.
+> (docker-compose.yml: `codex_auth:/home/node/.codex`)
 
 ---
 
@@ -142,6 +142,101 @@ CREATE TABLE channel_skills (
 
 ---
 
+## 영속 저장소
+
+- `./data:/app/data`
+  SQLite 데이터베이스 저장
+- `codex_auth:/home/node/.codex`
+  Codex CLI 인증 정보를 Docker named volume으로 저장
+
+이 프로젝트는 호스트 홈 디렉터리(`~/.codex`)를 직접 bind mount 하지 않습니다.
+인증 정보는 `codex_auth` named volume에 격리 보관됩니다.
+
+---
+
+## Codex CLI 인증 방법
+
+이 프로젝트는 컨테이너 내부에서 Codex CLI OAuth 로그인 방식으로 인증합니다.
+인증 정보는 `codex_auth` Docker named volume(`/home/node/.codex`)에 영속 저장됩니다.
+
+### 최초 인증
+
+```bash
+# 1. 원격 서버에 SSH 접속
+ssh <사용자>@<서버IP>
+
+# 2. 프로젝트 디렉터리로 이동
+cd /data/volumes/codex-discord
+
+# 3. 컨테이너 빌드 및 실행
+docker compose up -d --build
+
+# 4. 실행 중인 컨테이너 내부로 접속
+docker exec -it codex-discord sh
+
+# 5. Codex CLI 로그인 시작
+codex
+```
+
+이후 동작:
+
+- Codex CLI가 로그인 URL을 출력합니다.
+- 서버는 headless 환경이므로 브라우저가 자동으로 열리지 않습니다.
+- 출력된 URL을 복사해서 **로컬 PC 브라우저**에서 열고 OpenAI 계정으로 로그인합니다.
+- 인증이 완료되면 컨테이너 안의 Codex CLI가 인증 상태를 유지합니다.
+
+SSH 환경 기준 흐름:
+
+1. 로컬 PC 터미널에서 서버로 `ssh` 접속
+2. 서버 셸에서 `docker exec -it codex-discord sh` 실행
+3. 컨테이너 내부에서 `codex` 실행
+4. 출력된 로그인 URL을 로컬 PC 브라우저에 붙여넣어 인증
+5. 인증 완료 후 `exit`로 컨테이너에서 나옴
+
+### 인증 확인
+
+컨테이너 내부에서 아래 명령으로 확인합니다.
+
+```bash
+codex --full-auto -p "안녕"
+```
+
+정상이라면 Codex가 텍스트 응답을 출력해야 합니다.
+
+### 재인증
+
+인증이 만료되었거나 깨진 경우:
+
+```bash
+docker exec -it codex-discord sh
+codex
+```
+
+볼륨 소유권이 꼬인 경우 한 번만 아래처럼 복구합니다.
+
+```bash
+docker exec -u 0 -it codex-discord sh
+chown -R node:node /home/node/.codex
+exit
+
+docker exec -it codex-discord sh
+codex
+```
+
+### 볼륨 완전 초기화
+
+`codex_auth` volume을 처음부터 다시 설정해야 하는 경우:
+
+```bash
+docker compose down
+docker volume rm codex-discord_codex_auth
+docker compose up -d --build
+docker exec -it codex-discord sh
+codex
+```
+
+---
+
 ## 배포 절차
 
 ### 최초 배포
@@ -157,7 +252,11 @@ mkdir -p data
 # 3. 빌드 및 실행
 docker compose up -d --build
 
-# 4. 슬래시 명령어 등록 (최초 1회)
+# 4. Codex CLI 인증 (최초 1회) — 위의 "Codex CLI 인증 방법" 섹션 참고
+docker exec -it codex-discord sh
+# codex 실행 → 로그인 URL 출력 → 로컬 브라우저에서 인증 → exit
+
+# 5. 슬래시 명령어 등록 (최초 1회)
 docker exec codex-discord node deploy-commands.mjs
 ```
 
@@ -188,7 +287,7 @@ docker logs codex-discord --tail 50
 | 증상 | 원인 | 해결 |
 |------|------|------|
 | `SQLITE_CANTOPEN` | `data/` 디렉토리 없거나 권한 없음 | `mkdir -p data` 확인 |
-| Codex CLI 인증 실패 | `~/.codex` 볼륨 마운트 누락 또는 설정 파일 없음 | 서버에 `~/.codex` 설정 파일 존재 여부 확인 |
+| Codex CLI 인증 실패 | 인증 미완료 또는 토큰 만료 | `docker exec -it codex-discord sh` 후 `codex` 실행해 재로그인 |
 | `Codex CLI spawn failed` | `@openai/codex` 미설치 | Docker 재빌드 (`docker compose up -d --build`) |
 | `Codex CLI timeout` | 느린 네트워크 또는 복잡한 요청 | `CODEX_TIMEOUT_MS` 상수 값 증가 (기본 180초) |
 | 슬래시 명령어 미반영 | CLIENT_ID 미설정 또는 등록 미실행 | `docker exec codex-discord node deploy-commands.mjs` |
